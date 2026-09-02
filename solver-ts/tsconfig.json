@@ -1,0 +1,14 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "lib": ["ES2020", "DOM"],
+    "strict": true,
+    "rootDir": "src",
+    "outDir": "../site/js",
+    "sourceMap": false,
+    "declaration": false
+  },
+  "include": ["src/**/*.ts"]
+}

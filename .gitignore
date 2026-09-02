@@ -1,0 +1,25 @@
+# Secrets
+.env
+reddit_state.json
+
+# Python
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Node / TypeScript (solver-ts) — compiled output lives in site/js/ and IS
+# committed, since GitHub Pages serves site/ as-is with no build step.
+solver-ts/node_modules/
+solver-ts/package-lock.json
+
+# Playwright
+playwright-report/
+test-results/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# VS Code (keep launch.json, ignore workspace-specific junk if any)
+.vscode/*.log

@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Tim Cieplowski - Color Puzzle Solutions</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+  body {
+    font-family: system-ui, sans-serif;
+    background: #0f172a;
+    color: #f1f5f9;
+    max-width: 680px;
+    margin: 2rem 0;
+    padding: 0 1rem;
+  }
+  h1 { font-size: 1.5rem; }
+  h2 { font-size: 1.15rem; margin-top: 2.5rem; }
+  #status { color: #94a3b8; }
+  ol { padding-left: 1.5rem; }
+  li { margin: 0.25rem 0; }
+  .error { color: #f87171; }
+  .help { color: #94a3b8; font-size: 0.85rem; }
+
+  #custom-input {
+    width: 100%;
+    box-sizing: border-box;
+    background: #1e293b;
+    color: #f1f5f9;
+    border: 1px solid #334155;
+    border-radius: 0.375rem;
+    padding: 0.5rem;
+    margin-top: 0.5rem;
+    font-family: ui-monospace, monospace;
+    font-size: 0.85rem;
+    resize: vertical;
+  }
+  #custom-solve-btn {
+    margin-top: 0.5rem;
+    background: #0ea5e9;
+    color: #0f172a;
+    border: none;
+    border-radius: 0.375rem;
+    padding: 0.5rem 1rem;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  #custom-solve-btn:disabled { opacity: 0.6; cursor: default; }
+
+  .board {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: 3rem;
+    grid-template-rows: repeat(4, 1.6rem) auto;
+    justify-items: center;
+    gap: 0.3rem 0.4rem;
+    margin: 1rem 0 1.5rem;
+    overflow-x: auto;
+    padding-bottom: 0.25rem;
+  }
+  .tube-number { text-align: center; color: #94a3b8; font-size: 0.8rem; }
+  .swatch, .swatch-empty {
+    width: 1.5rem;
+    height: 1.5rem;
+    border-radius: 0.25rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.7rem;
+    font-weight: 700;
+    vertical-align: middle;
+  }
+  .swatch {
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    color: #000;
+    text-shadow: 0 0 2px #fff, 0 0 4px #fff;
+  }
+  .swatch-empty {
+    border: 1px dashed rgba(255, 255, 255, 0.15);
+    color: #475569;
+  }
+</style>
+</head>
+<body>
+  <h1>Color Puzzle — Today's Solution</h1>
+  <p id="status">Loading...</p>
+  <div id="board" class="board"></div>
+  <p id="solution">Loading...</p>
+  <ol id="moves"></ol>
+
+  <div id="fallback" hidden>
+    <p class="error">Showing the September 1, 2026 solution as an example until today's puzzle can be loaded.</p>
+    <div id="fallback-board" class="board"></div>
+    <ol id="fallback-moves"></ol>
+  </div>
+
+  <section id="custom">
+    <h2>Solve Your Own Puzzle</h2>
+    <p class="help">
+      4 letters per tube, tubes separated by spaces, last two tubes empty
+      (<code>----</code>) as spare space — same layout as above.
+    </p>
+    <p class="help" id="custom-help">Loading today's puzzle as an example...</p>
+    <textarea id="custom-input" rows="2" spellcheck="false"></textarea><br>
+    <button id="custom-solve-btn">Solve</button>
+    <p id="custom-status"></p>
+    <div id="custom-board" class="board"></div>
+    <ol id="custom-moves"></ol>
+  </section>
+
+  <script type="module">
+    import { solveBoard } from "./js/solver.js";
+
+    const FALLBACK_DATE = "2026-09-01";
+
+    // Known colors as of writing. Any letter not listed here (the puzzle
+    // has added new ones before, e.g. "L") falls back to a hash-derived
+    // hue in colorForLetter() so a new one never breaks rendering.
+    const COLOR_MAP = {
+      O: "#ffa500", // orange
+      P: "#800080", // purple
+      I: "#6366f1", // indigo
+      C: "#00ffff", // cyan
+      M: "#ff00ff", // magenta
+      Y: "#ffff00", // yellow
+      G: "#00ff00", // green
+      R: "#ff0000", // red
+      W: "#d3d3d3", // light gray/white
+      B: "#0000ff", // blue
+    };
+
+    function colorForLetter(letter) {
+      if (COLOR_MAP[letter]) return COLOR_MAP[letter];
+      let hash = 0;
+      for (let i = 0; i < letter.length; i++) {
+        hash = letter.charCodeAt(i) + ((hash << 5) - hash);
+      }
+      return `hsl(${Math.abs(hash) % 360}, 70%, 55%)`;
+    }
+
+    async function loadSolution(dateStr) {
+      const res = await fetch(`solutions/${dateStr}.json`);
+      if (!res.ok) throw new Error(`No solution file found for ${dateStr}`);
+      return res.json();
+    }
+
+    const TUBE_DEPTH = 4;
+
+    function renderBoard(el, board) {
+      el.innerHTML = "";
+      // Each tube is a grid column: empty slots (missing from the top of
+      // the physical tube) as dashes, then the filled slots bottom-up,
+      // then the tube number — grid-auto-flow: column places these 5
+      // items into one column per tube automatically.
+      board.forEach((tube, i) => {
+        const padded = Array(TUBE_DEPTH - tube.length).fill(null).concat([...tube].reverse());
+
+        padded.forEach((letter) => {
+          const cell = document.createElement("span");
+          if (letter) {
+            cell.className = "swatch";
+            cell.style.background = colorForLetter(letter);
+            cell.textContent = letter;
+          } else {
+            cell.className = "swatch-empty";
+            cell.textContent = "-";
+          }
+          el.appendChild(cell);
+        });
+
+        const label = document.createElement("span");
+        label.className = "tube-number";
+        label.textContent = i + 1;
+        el.appendChild(label);
+      });
+    }
+
+    function renderMoves(el, moves) {
+      el.innerHTML = "";
+      moves.forEach((move) => {
+        const li = document.createElement("li");
+
+        const swatch = document.createElement("span");
+        swatch.className = "swatch";
+        swatch.style.background = colorForLetter(move.color);
+        swatch.textContent = move.color;
+
+        li.append(
+          `Move `,
+          swatch,
+          ` from ${move.from + 1} to ${move.to + 1}.`
+        );
+        el.appendChild(li);
+      });
+    }
+
+    // solveBoard() itself now comes from ./js/solver.js — compiled from
+    // solver-ts/src/solver.ts, the same source main.py's pipeline uses via
+    // solver-ts/src/cli.ts. One implementation instead of two copies.
+
+    function boardToString(board) {
+      // Matches the grid's reading order (top-to-bottom per column), which
+      // is each tube reversed from the raw top-slot-first board array.
+      return board
+        .map((tube) => (tube.length === 0 ? "-".repeat(TUBE_DEPTH) : tube.slice().reverse().join("")))
+        .join(" ");
+    }
+
+    function parseBoardString(str) {
+      const tokens = str.trim().split(/\s+/).filter(Boolean);
+      if (tokens.length < 2) {
+        throw new Error(`Enter at least the two empty tubes (${"-".repeat(TUBE_DEPTH)}).`);
+      }
+
+      const emptyToken = "-".repeat(TUBE_DEPTH);
+      tokens.forEach((tok, i) => {
+        if (tok.length !== TUBE_DEPTH) {
+          throw new Error(`Tube ${i + 1} ("${tok}") must be exactly ${TUBE_DEPTH} characters.`);
+        }
+      });
+
+      const lastTwo = tokens.slice(-2);
+      if (!lastTwo.every((tok) => tok === emptyToken)) {
+        throw new Error(
+          `The last two tubes must be empty (${emptyToken}) — the solver needs two spare tubes, matching the daily puzzle's layout.`
+        );
+      }
+
+      const filled = tokens.slice(0, -2);
+      for (const tok of filled) {
+        if (!/^[A-Za-z]+$/.test(tok)) {
+          throw new Error(`Tube "${tok}" must be ${TUBE_DEPTH} letters with no dashes — only the last two tubes may be empty.`);
+        }
+      }
+
+      // Tokens are typed in grid reading order (top-to-bottom); reverse each
+      // back to the raw top-slot-first order the rest of the code expects.
+      return tokens.map((tok) => (tok === emptyToken ? [] : tok.toUpperCase().split("").reverse()));
+    }
+
+    function updateCustomHelp(board) {
+      const helpEl = document.getElementById("custom-help");
+      helpEl.textContent = `Today's puzzle: ${boardToString(board)}`;
+    }
+
+    async function handleSolveClick() {
+      const input = document.getElementById("custom-input");
+      const statusEl = document.getElementById("custom-status");
+      const boardEl = document.getElementById("custom-board");
+      const movesEl = document.getElementById("custom-moves");
+      const btn = document.getElementById("custom-solve-btn");
+
+      statusEl.classList.remove("error");
+      boardEl.innerHTML = "";
+      movesEl.innerHTML = "";
+
+      let board;
+      try {
+        board = parseBoardString(input.value);
+      } catch (err) {
+        statusEl.textContent = err.message;
+        statusEl.classList.add("error");
+        return;
+      }
+
+      renderBoard(boardEl, board);
+      statusEl.textContent = "Solving...";
+      btn.disabled = true;
+
+      // Yield to the browser so "Solving..." actually paints before the
+      // synchronous search blocks the main thread.
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      try {
+        const moves = solveBoard(board, 8000);
+        statusEl.textContent = `Solved in ${moves.length} moves.`;
+        renderMoves(movesEl, moves);
+      } catch (err) {
+        statusEl.textContent =
+          err.message === "TIMEOUT"
+            ? "This puzzle is taking too long to solve — it may be unsolvable or too complex."
+            : err.message;
+        statusEl.classList.add("error");
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    document.getElementById("custom-solve-btn").addEventListener("click", handleSolveClick);
+
+    async function showFallback() {
+      const fallbackEl = document.getElementById("fallback");
+      const fallbackBoardEl = document.getElementById("fallback-board");
+      const fallbackMovesEl = document.getElementById("fallback-moves");
+
+      try {
+        const data = await loadSolution(FALLBACK_DATE);
+        renderBoard(fallbackBoardEl, data.board);
+        renderMoves(fallbackMovesEl, data.moves);
+        fallbackEl.hidden = false;
+        updateCustomHelp(data.board);
+      } catch (err) {
+        console.error("Fallback solution also failed to load", err);
+      }
+    }
+
+    async function main() {
+      const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+      const statusEl = document.getElementById("status");
+      const boardEl = document.getElementById("board");
+      const solutionEl = document.getElementById("solution");
+      const movesEl = document.getElementById("moves");
+
+      try {
+        const data = await loadSolution(today);
+        statusEl.textContent = `${today} puzzle from reddit.com/r/ColorPuzzleGame/`;
+        solutionEl.textContent = `Solved in ${data.moves.length} moves.`;
+        renderBoard(boardEl, data.board);
+        renderMoves(movesEl, data.moves);
+        updateCustomHelp(data.board);
+      } catch (err) {
+        statusEl.textContent = "Couldn't load today's solution yet — check back later.";
+        statusEl.classList.add("error");
+        solutionEl.textContent = "";
+        console.error(err);
+        await showFallback();
+      }
+    }
+
+    main();
+  </script>
+</body>
+</html>

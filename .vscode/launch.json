@@ -1,0 +1,27 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Run main.py",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/main.py",
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Test: fetch_post",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "scraper.fetch_post",
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Test: extract_board (needs URL arg)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "scraper.extract_board",
+      "args": ["PASTE_A_PUZZLE_URL_HERE"],
+      "console": "integratedTerminal"
+    }
+  ]
+}
