@@ -17,6 +17,9 @@ solver-ts/package-lock.json
 playwright-report/
 test-results/
 
+# Local scheduled-run logs (scripts/run_daily.ps1)
+logs/
+
 # OS
 .DS_Store
 Thumbs.db
