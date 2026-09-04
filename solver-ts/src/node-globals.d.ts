@@ -12,3 +12,11 @@ declare const process: {
   stderr: { write(data: string): void };
   exit(code: number): never;
 };
+
+// Node extends the base ECMAScript ImportMeta (which only guarantees `url`)
+// with `main` — true when the file is the program's entry point, false when
+// it's only imported. @types/node would declare this too; hand-declared
+// here for the same reason as `process` above.
+interface ImportMeta {
+  main: boolean;
+}

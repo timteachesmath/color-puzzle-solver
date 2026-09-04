@@ -14,31 +14,31 @@ $logFile = Join-Path $projectDir "logs\daily_run.log"
 Set-Location $projectDir
 New-Item -ItemType Directory -Path (Join-Path $projectDir "logs") -Force | Out-Null
 
-"=== Run started: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') ===" | Out-File -Append $logFile
+"=== Run started: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') ===" | Out-File -Append $logFile -Encoding utf8
 
-& ".\venv\Scripts\python.exe" main.py 2>&1 | Out-File -Append $logFile
+& ".\venv\Scripts\python.exe" main.py 2>&1 | Out-File -Append $logFile -Encoding utf8
 if ($LASTEXITCODE -ne 0) {
-    "=== Run FAILED: main.py exited with code $LASTEXITCODE ===" | Out-File -Append $logFile
+    "=== Run FAILED: main.py exited with code $LASTEXITCODE ===" | Out-File -Append $logFile -Encoding utf8
     exit 1
 }
 
-git add site/solutions/*.json 2>&1 | Out-File -Append $logFile
+git add site/solutions/*.json 2>&1 | Out-File -Append $logFile -Encoding utf8
 git diff --staged --quiet
 if ($LASTEXITCODE -ne 0) {
-    git commit -m "Add solution for $(Get-Date -Format yyyy-MM-dd)" 2>&1 | Out-File -Append $logFile
+    git commit -m "Add solution for $(Get-Date -Format yyyy-MM-dd)" 2>&1 | Out-File -Append $logFile -Encoding utf8
     if ($LASTEXITCODE -ne 0) {
-        "=== Run FAILED: git commit exited with code $LASTEXITCODE ===" | Out-File -Append $logFile
+        "=== Run FAILED: git commit exited with code $LASTEXITCODE ===" | Out-File -Append $logFile -Encoding utf8
         exit 1
     }
 
-    git push 2>&1 | Out-File -Append $logFile
+    git push 2>&1 | Out-File -Append $logFile -Encoding utf8
     if ($LASTEXITCODE -ne 0) {
-        "=== Run FAILED: git push exited with code $LASTEXITCODE ===" | Out-File -Append $logFile
+        "=== Run FAILED: git push exited with code $LASTEXITCODE ===" | Out-File -Append $logFile -Encoding utf8
         exit 1
     }
-    "Pushed new solution." | Out-File -Append $logFile
+    "Pushed new solution." | Out-File -Append $logFile -Encoding utf8
 } else {
-    "No changes to commit." | Out-File -Append $logFile
+    "No changes to commit." | Out-File -Append $logFile -Encoding utf8
 }
 
-"=== Run succeeded: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') ===" | Out-File -Append $logFile
+"=== Run succeeded: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') ===" | Out-File -Append $logFile -Encoding utf8
