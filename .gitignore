@@ -20,6 +20,9 @@ test-results/
 # Local scheduled-run logs (scripts/run_daily.ps1)
 logs/
 
+# Claude Code local settings (machine-specific permissions)
+.claude/
+
 # OS
 .DS_Store
 Thumbs.db

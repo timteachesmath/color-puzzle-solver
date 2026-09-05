@@ -19,7 +19,7 @@
   ol { padding-left: 1.5rem; }
   li { margin: 0.25rem 0; }
   .error { color: #f87171; }
-  .help { color: #94a3b8; font-size: 0.85rem; }
+  .help { display: block; color: #94a3b8; font-size: 0.85rem; }
 
   #custom-input {
     width: 100%;
@@ -50,7 +50,8 @@
     display: grid;
     grid-auto-flow: column;
     grid-auto-columns: 3rem;
-    grid-template-rows: repeat(4, 1.6rem) auto;
+    /* grid-template-rows is set by renderBoard() from the board's own depth,
+       since the row count has to match the cells it emits per tube. */
     justify-items: center;
     gap: 0.3rem 0.4rem;
     margin: 1rem 0 1.5rem;
@@ -97,10 +98,9 @@
 
   <section id="custom">
     <h2>Solve Your Own Puzzle</h2>
-    <p class="help">
-      4 letters per tube, tubes separated by spaces, last two tubes empty
-      (<code>----</code>) as spare space — same layout as above.
-    </p>
+    <label class="help" for="custom-input">
+      Enter a letter for each color, a dash for moved colors. Separate tubes with spaces. 
+    </label>
     <p class="help" id="custom-help">Loading today's puzzle as an example...</p>
     <textarea id="custom-input" rows="2" spellcheck="false"></textarea><br>
     <button id="custom-solve-btn">Solve</button>
@@ -132,11 +132,56 @@
 
     function colorForLetter(letter) {
       if (COLOR_MAP[letter]) return COLOR_MAP[letter];
+
       let hash = 0;
       for (let i = 0; i < letter.length; i++) {
         hash = letter.charCodeAt(i) + ((hash << 5) - hash);
       }
-      return `hsl(${Math.abs(hash) % 360}, 70%, 55%)`;
+      hash = Math.abs(hash);
+
+      // Using the hash directly as a hue put every letter in a 25° band of
+      // yellow-green — for a single character the loop above reduces to its
+      // char code, and A–Z is only 65–90. Stepping by the golden angle
+      // spreads consecutive letters as far apart as possible instead. The
+      // closest pairs that remain (~8° apart, e.g. E/Z and A/V) come from
+      // char codes 21 apart, which is odd — so alternating lightness on
+      // parity always separates exactly those near-collisions.
+      const hue = (hash * 137.508) % 360;
+      const lightness = hash % 2 ? 45 : 62;
+      return `hsl(${hue}, 70%, ${lightness}%)`;
+    }
+
+    // The daily puzzle rolls over at 6:00 AM Central, not UTC midnight — so
+    // "today" here means "the current puzzle day," computed against
+    // America/Chicago wall-clock time (DST-safe via Intl) regardless of the
+    // viewer's own timezone, not the literal calendar date anywhere else.
+    function getPuzzleDateString() {
+      const parts = new Intl.DateTimeFormat("en-US", {
+        timeZone: "America/Chicago",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hourCycle: "h23",
+        hour: "2-digit",
+      }).formatToParts(new Date());
+
+      const get = (type) => parts.find((p) => p.type === type).value;
+      let year = Number(get("year"));
+      let month = Number(get("month"));
+      let day = Number(get("day"));
+      let hour = Number(get("hour"));
+      if (hour === 24) hour = 0; // some engines report midnight as "24"
+
+      if (hour < 6) {
+        const d = new Date(Date.UTC(year, month - 1, day));
+        d.setUTCDate(d.getUTCDate() - 1);
+        year = d.getUTCFullYear();
+        month = d.getUTCMonth() + 1;
+        day = d.getUTCDate();
+      }
+
+      const pad = (n) => String(n).padStart(2, "0");
+      return `${year}-${pad(month)}-${pad(day)}`;
     }
 
     async function loadSolution(dateStr) {
@@ -145,16 +190,19 @@
       return res.json();
     }
 
-    const TUBE_DEPTH = 4;
-
     function renderBoard(el, board) {
       el.innerHTML = "";
       // Each tube is a grid column: empty slots (missing from the top of
       // the physical tube) as dashes, then the filled slots bottom-up,
-      // then the tube number — grid-auto-flow: column places these 5
-      // items into one column per tube automatically.
+      // then the tube number — grid-auto-flow: column places those
+      // depth + 1 items into one column per tube automatically. The row
+      // template has to match that count exactly or the columns misalign,
+      // so it's set here from the same depth rather than fixed in CSS.
+      const depth = Math.max(...board.map((tube) => tube.length));
+      el.style.gridTemplateRows = `repeat(${depth}, 1.6rem) auto`;
+
       board.forEach((tube, i) => {
-        const padded = Array(TUBE_DEPTH - tube.length).fill(null).concat([...tube].reverse());
+        const padded = Array(depth - tube.length).fill(null).concat([...tube].reverse());
 
         padded.forEach((letter) => {
           const cell = document.createElement("span");
@@ -200,48 +248,44 @@
     // solver-ts/src/cli.ts. One implementation instead of two copies.
 
     function boardToString(board) {
-      // Matches the grid's reading order (top-to-bottom per column), which
-      // is each tube reversed from the raw top-slot-first board array.
-      return board
-        .map((tube) => (tube.length === 0 ? "-".repeat(TUBE_DEPTH) : tube.slice().reverse().join("")))
-        .join(" ");
+      // Raw pour order (matches data.board / what the solver takes directly
+      // — no grid-reading-order reversal). Trailing dashes stand in for
+      // anything missing, so removing a tube's most recently poured unit
+      // is just dropping the last letter: "BBCY" -> "BBC-".
+      const depth = Math.max(...board.map((tube) => tube.length));
+      return board.map((tube) => tube.join("").padEnd(depth, "-")).join(" ");
     }
 
     function parseBoardString(str) {
       const tokens = str.trim().split(/\s+/).filter(Boolean);
       if (tokens.length < 2) {
-        throw new Error(`Enter at least the two empty tubes (${"-".repeat(TUBE_DEPTH)}).`);
+        throw new Error("Enter at least two tubes.");
       }
 
-      const emptyToken = "-".repeat(TUBE_DEPTH);
+      // Depth comes from the tubes themselves rather than a fixed constant —
+      // they just all have to agree with each other.
+      const depth = tokens[0].length;
       tokens.forEach((tok, i) => {
-        if (tok.length !== TUBE_DEPTH) {
-          throw new Error(`Tube ${i + 1} ("${tok}") must be exactly ${TUBE_DEPTH} characters.`);
+        if (tok.length !== depth) {
+          throw new Error(
+            `Tube ${i + 1} ("${tok}") is ${tok.length} characters, but tube 1 is ${depth} — every tube must be the same depth.`
+          );
+        }
+        if (!/^[A-Za-z]*-*$/.test(tok)) {
+          throw new Error(
+            `Tube ${i + 1} ("${tok}") must be letters followed by dashes for anything missing (e.g. "BBC-"), not dashes before letters.`
+          );
         }
       });
 
-      const lastTwo = tokens.slice(-2);
-      if (!lastTwo.every((tok) => tok === emptyToken)) {
-        throw new Error(
-          `The last two tubes must be empty (${emptyToken}) — the solver needs two spare tubes, matching the daily puzzle's layout.`
-        );
-      }
-
-      const filled = tokens.slice(0, -2);
-      for (const tok of filled) {
-        if (!/^[A-Za-z]+$/.test(tok)) {
-          throw new Error(`Tube "${tok}" must be ${TUBE_DEPTH} letters with no dashes — only the last two tubes may be empty.`);
-        }
-      }
-
-      // Tokens are typed in grid reading order (top-to-bottom); reverse each
-      // back to the raw top-slot-first order the rest of the code expects.
-      return tokens.map((tok) => (tok === emptyToken ? [] : tok.toUpperCase().split("").reverse()));
+      // Any puzzle state works now, not just the fully-packed start — a
+      // tube can be missing any number of its most-recently-poured units.
+      return tokens.map((tok) => tok.replace(/-+$/, "").toUpperCase().split(""));
     }
 
     function updateCustomHelp(board) {
       const helpEl = document.getElementById("custom-help");
-      helpEl.textContent = `Today's puzzle: ${boardToString(board)}`;
+      helpEl.textContent = `For example, today's puzzle would be ${boardToString(board)}`;
     }
 
     async function handleSolveClick() {
@@ -306,7 +350,7 @@
     }
 
     async function main() {
-      const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+      const today = getPuzzleDateString();
       const statusEl = document.getElementById("status");
       const boardEl = document.getElementById("board");
       const solutionEl = document.getElementById("solution");
