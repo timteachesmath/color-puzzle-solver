@@ -1,31 +1,9 @@
 /**
- * Color-sort puzzle solver — A* search over pour moves, using a binary
- * heap ordered by f = g + h and a canonical (order-independent) closed
- * set to dedupe states. TypeScript so the browser (site/index.html) and
+ * Color-sort puzzle solver. A* search over pour moves.
+ * TypeScript so the browser (site/index.html) and
  * the daily pipeline (main.py, via cli.ts) share one implementation
  * instead of two hand-kept-in-sync copies.
- *
- * Tube depth is inferred from the board (or given explicitly via
- * `solveBoard`'s `tubeDepth` argument) — unlike the algorithm this
- * replaced, there's no assumption about how many tubes are empty or
- * where they sit.
  */
-const TUBE_DEPTH = 4;
-// Kept independently of the A* implementation below — solver.test.ts uses
-// this to replay and verify solveBoard's output via a completely separate
-// code path, rather than trusting the algorithm to check its own work.
-export function doOneMove(tubes, x) {
-    const a = tubes[x[0]];
-    const b = tubes[x[1]];
-    let i = 0;
-    while (a.length > i + 1 && a[i + 1] === a[i] && i + 1 + b.length < TUBE_DEPTH) {
-        i += 1;
-    }
-    const r = tubes.slice();
-    r[x[1]] = a.slice(0, i + 1) + b;
-    r[x[0]] = a.slice(i + 1);
-    return r;
-}
 /**
  * Solve a puzzle board (raw top-slot-first order, same shape as the daily
  * JSON's `board` field). Throws if no solution is found or the search
@@ -38,16 +16,16 @@ export function solveBoard(board, timeBudgetMs = 8000, tubeDepth) {
     // the longest tube present, which handles both already-uniform boards
     // and ragged ones (e.g. empty tubes arriving as `[]`).
     const depth = tubeDepth ?? Math.max(...board.map((tube) => tube.length));
-    const heap = new IndexMinHeap;
+    const heap = new IndexMinHeap();
     const used = new Set();
-    const normalizedBoard = board.map((tube) => tube.length < depth ? tube.concat(Array(depth - tube.length).fill("")) : tube);
+    const normalizedBoard = board.map((tube) => tube.length < depth ? padTube(tube, depth) : tube);
     const tubes = normalizedBoard.map((tube) => new Tube(tube));
-    const initialPuzzleState = new PuzzleState(tubes);
+    const initialPuzzleState = new PuzzleState(tubes, depth);
     heap.insert([initialPuzzleState.g + initialPuzzleState.h, initialPuzzleState.g, initialPuzzleState]);
-    while (heap.size() > 0) {
+    let currentItem;
+    while ((currentItem = heap.poll()) !== null) {
         if (Date.now() > deadline)
             throw new Error("TIMEOUT");
-        const currentItem = heap.poll();
         const state = currentItem[2];
         const canonicalForm = getCanonicalForm(state.tubes);
         if (used.has(canonicalForm))
@@ -78,7 +56,7 @@ function tryMove(i, j, currentState, used, tubeDepth) {
         const canonicalTubes = getCanonicalForm(newTubes);
         if (!used.has(canonicalTubes)) {
             const move = { from: i, to: j, color: tubes[i].color };
-            const newState = new PuzzleState(newTubes, currentState, move);
+            const newState = new PuzzleState(newTubes, tubeDepth, currentState, move);
             return [newState.g + newState.h, newState.g, newState];
         }
     }
@@ -86,24 +64,18 @@ function tryMove(i, j, currentState, used, tubeDepth) {
 }
 function unravelMoves(state) {
     let ret = [];
-    if (!state.move) {
-        return ret;
-    }
-    ret.push(state.move);
     let currentState = state;
-    while (currentState.previousState) {
+    while (currentState && currentState.move) {
+        ret.push(currentState.move);
         currentState = currentState.previousState;
-        if (currentState.move) {
-            ret = [currentState.move].concat(ret);
-        }
     }
-    return ret;
+    return ret.reverse();
 }
 function isLegalMove(i, j) {
-    if (i.capacityUsed == 0) {
+    if (i.capacityUsed === 0) {
         return false;
     }
-    if (j.color && i.color != j.color) {
+    if (j.color && i.color !== j.color) {
         return false;
     }
     if (i.colorLength > j.capacityTotal - j.capacityUsed) {
@@ -111,16 +83,19 @@ function isLegalMove(i, j) {
     }
     return true;
 }
-export function doMove(tubes, i, j, tubeDepth = TUBE_DEPTH) {
+export function doMove(tubes, i, j, tubeDepth) {
     const ret = tubes.slice();
     const segmentLength = ret[i].colorLength;
     const jUsed = ret[j].aryTube.slice(0, ret[j].capacityUsed).concat(Array(segmentLength).fill(ret[i].color));
-    const jTube = jUsed.concat(Array(tubeDepth - jUsed.length).fill(""));
+    const jTube = padTube(jUsed, tubeDepth);
     const iUsed = ret[i].aryTube.slice(0, ret[i].capacityUsed - segmentLength);
-    const iTube = iUsed.concat(Array(tubeDepth - iUsed.length).fill(""));
+    const iTube = padTube(iUsed, tubeDepth);
     ret[i] = new Tube(iTube);
     ret[j] = new Tube(jTube);
     return ret;
+}
+function padTube(tube, length) {
+    return tube.concat(Array(Math.max(0, length - tube.length)).fill(""));
 }
 function getCanonicalForm(tubes) {
     return tubes.map((tube) => tube.toString()).sort().join("|");
@@ -134,7 +109,7 @@ export class IndexMinHeap {
     getLeftChildIndex(i) { return 2 * i + 1; }
     getRightChildIndex(i) { return 2 * i + 2; }
     swap(i1, i2) {
-        let temp = this.heap[i1];
+        const temp = this.heap[i1];
         this.heap[i1] = this.heap[i2];
         this.heap[i2] = temp;
     }
@@ -201,7 +176,7 @@ export class IndexMinHeap {
         return this.heap.length;
     }
 }
-class Tube {
+export class Tube {
     constructor(aryTube) {
         this.aryTube = aryTube;
         this.capacityTotal = aryTube.length;
@@ -243,27 +218,27 @@ class Tube {
     }
 }
 class PuzzleState {
-    constructor(tubes, previousBoard, move) {
-        if (previousBoard) {
-            this.g = previousBoard.g + 1;
+    constructor(tubes, depth, previousState, move) {
+        if (previousState) {
+            this.g = previousState.g + 1;
         }
         else {
             this.g = 0;
         }
         this.tubes = tubes;
-        this.previousState = previousBoard || null;
+        this.previousState = previousState || null;
         this.move = move || null;
-        this.h = getTubesHeuristic(tubes);
+        this.h = getTubesHeuristic(tubes, depth);
     }
 }
-function getTubesHeuristic(tubes) {
-    const tubeSize = tubes[0].capacityTotal;
+/** The minimum number of moves necessary to join all segments to fill monochromatic tubes  */
+function getTubesHeuristic(tubes, tubeSize) {
     let segments = 0;
     let filled = 0;
-    tubes.forEach((tube, t) => {
+    for (const tube of tubes) {
         segments += tube.segments;
         filled += tube.capacityUsed;
-    });
+    }
     const idealSegments = Math.floor(filled / tubeSize);
     return segments - idealSegments;
 }

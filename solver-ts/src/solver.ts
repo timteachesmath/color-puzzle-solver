@@ -23,22 +23,23 @@ export function solveBoard(board: Board, timeBudgetMs = 8000, tubeDepth?: number
   // and ragged ones (e.g. empty tubes arriving as `[]`).
   const depth = tubeDepth ?? Math.max(...board.map((tube) => tube.length));
 
-  const heap = new IndexMinHeap;
+  const heap = new IndexMinHeap<PuzzleState>();
   const used = new Set<string>();
 
   const normalizedBoard = board.map((tube) =>
-    tube.length < depth ? tube.concat(Array(depth - tube.length).fill("")) : tube
+    tube.length < depth ? padTube(tube, depth) : tube
   );
   const tubes: Tube[] = normalizedBoard.map((tube) => new Tube(tube));
 
-  const initialPuzzleState = new PuzzleState(tubes);
+  const initialPuzzleState = new PuzzleState(tubes, depth);
   heap.insert([initialPuzzleState.g + initialPuzzleState.h, initialPuzzleState.g, initialPuzzleState]);
 
-  while (heap.size() > 0) {
+  let currentItem: HeapItem<PuzzleState> | null;
+
+  while ((currentItem = heap.poll()) !== null) {
     if (Date.now() > deadline) throw new Error("TIMEOUT");
 
-    const currentItem = heap.poll() as HeapItem;
-    const state = currentItem[2] as PuzzleState;
+    const state = currentItem[2];
     const canonicalForm = getCanonicalForm(state.tubes);
     if (used.has(canonicalForm)) continue;   // stale duplicate — skip it
 
@@ -65,14 +66,14 @@ export function solveBoard(board: Board, timeBudgetMs = 8000, tubeDepth?: number
   throw new Error("No solution found for this puzzle.");
 }
 
-function tryMove(i: number, j: number, currentState: PuzzleState, used: Set<string>, tubeDepth: number): HeapItem | undefined {
+function tryMove(i: number, j: number, currentState: PuzzleState, used: Set<string>, tubeDepth: number): HeapItem<PuzzleState> | undefined {
   const tubes = currentState.tubes;
   if (isLegalMove(tubes[i], tubes[j])) {
     const newTubes = doMove(tubes, i, j, tubeDepth);
     const canonicalTubes = getCanonicalForm(newTubes);
     if (!used.has(canonicalTubes)) {
       const move = { from: i, to: j, color: tubes[i].color };
-      const newState = new PuzzleState(newTubes, currentState, move);
+      const newState = new PuzzleState(newTubes, tubeDepth, currentState, move);
       return [newState.g + newState.h, newState.g, newState];
     }
   }
@@ -82,23 +83,19 @@ function tryMove(i: number, j: number, currentState: PuzzleState, used: Set<stri
 
 function unravelMoves(state: PuzzleState): Move[] {
   let ret: Move[] = [];
-  if (!state.move) { return ret; }
 
-  ret.push(state.move);
-  let currentState = state;
-  while (currentState.previousState) {
+  let currentState: PuzzleState | null = state;
+  while (currentState && currentState.move) {
+    ret.push(currentState.move);
     currentState = currentState.previousState;
-    if (currentState.move) {
-      ret = [currentState.move].concat(ret);
-    }
   }
 
-  return ret;
+  return ret.reverse();
 }
 
 function isLegalMove(i: Tube, j: Tube): boolean {
-  if (i.capacityUsed == 0) { return false; }
-  if (j.color && i.color != j.color) { return false; }
+  if (i.capacityUsed === 0) { return false; }
+  if (j.color && i.color !== j.color) { return false; }
   if (i.colorLength > j.capacityTotal - j.capacityUsed) { return false; }
 
   return true;
@@ -109,10 +106,10 @@ export function doMove(tubes: Tube[], i: number, j: number, tubeDepth: number): 
   const segmentLength = ret[i].colorLength;
 
   const jUsed = ret[j].aryTube.slice(0, ret[j].capacityUsed).concat(Array(segmentLength).fill(ret[i].color));
-  const jTube = jUsed.concat(Array(tubeDepth - jUsed.length).fill(""));
+  const jTube = padTube(jUsed, tubeDepth);
 
   const iUsed = ret[i].aryTube.slice(0, ret[i].capacityUsed - segmentLength);
-  const iTube = iUsed.concat(Array(tubeDepth - iUsed.length).fill(""));
+  const iTube = padTube(iUsed, tubeDepth);
 
   ret[i] = new Tube(iTube);
   ret[j] = new Tube(jTube);
@@ -120,28 +117,32 @@ export function doMove(tubes: Tube[], i: number, j: number, tubeDepth: number): 
   return ret;
 }
 
+function padTube(tube: string[], length: number): string[] {
+  return tube.concat(Array(Math.max(0, length - tube.length)).fill(""));
+}
+
 function getCanonicalForm(tubes: Tube[]): string {
   return tubes.map((tube) => tube.toString()).sort().join("|");
 }
 
 /** A_star heuristic, A_star heuristic spent portion, payload */
-export type HeapItem = [number, number, object];
+export type HeapItem<T = unknown> = [number, number, T];
 
 /** Heap implementation for TypeScript. */
-export class IndexMinHeap {
-  private heap: HeapItem[] = [];
+export class IndexMinHeap<T = unknown> {
+  private heap: HeapItem<T>[] = [];
 
   private getParentIndex(i: number): number { return Math.floor((i - 1) / 2); }
   private getLeftChildIndex(i: number): number { return 2 * i + 1; }
   private getRightChildIndex(i: number): number { return 2 * i + 2; }
 
   private swap(i1: number, i2: number): void {
-    let temp = this.heap[i1];
+    const temp = this.heap[i1];
     this.heap[i1] = this.heap[i2];
     this.heap[i2] = temp;
   }
 
-  private compare(item1: HeapItem, item2: HeapItem): number {
+  private compare(item1: HeapItem<T>, item2: HeapItem<T>): number {
     // Primary sort: Compare index 0
     if (item1[0] !== item2[0]) {
       return item1[0] - item2[0];
@@ -150,7 +151,7 @@ export class IndexMinHeap {
     return item1[1] - item2[1];
   }
 
-  public insert(item: HeapItem): void {
+  public insert(item: HeapItem<T>): void {
     this.heap.push(item);
     this.heapifyUp();
   }
@@ -168,7 +169,7 @@ export class IndexMinHeap {
     }
   }
 
-  public poll(): HeapItem | null {
+  public poll(): HeapItem<T> | null {
     if (this.heap.length === 0) return null;
     if (this.heap.length === 1) return this.heap.pop()!;
 
@@ -207,7 +208,7 @@ export class IndexMinHeap {
     }
   }
 
-  public peek(): HeapItem | null {
+  public peek(): HeapItem<T> | null {
     return this.heap.length > 0 ? this.heap[0] : null;
   }
 
@@ -272,11 +273,12 @@ class PuzzleState {
 
   constructor(
     tubes: Tube[],
-    previousBoard?: PuzzleState | null,
+    depth: number,
+    previousState?: PuzzleState | null,
     move?: Move | null
   ) {
-    if (previousBoard) {
-      this.g = previousBoard.g + 1;
+    if (previousState) {
+      this.g = previousState.g + 1;
     }
     else {
       this.g = 0;
@@ -284,20 +286,20 @@ class PuzzleState {
 
     this.tubes = tubes;
 
-    this.previousState = previousBoard || null;
+    this.previousState = previousState || null;
     this.move = move || null;
-    this.h = getTubesHeuristic(tubes);
+    this.h = getTubesHeuristic(tubes, depth);
   }
 }
 
-function getTubesHeuristic(tubes: Tube[]): number {
-  const tubeSize = tubes[0].capacityTotal;
+/** The minimum number of moves necessary to join all segments to fill monochromatic tubes  */
+function getTubesHeuristic(tubes: Tube[], tubeSize: number): number {
   let segments = 0;
   let filled = 0;
-  tubes.forEach((tube, t) => {
+  for (const tube of tubes) {
     segments += tube.segments;
     filled += tube.capacityUsed;
-  });
+  }
 
   const idealSegments = Math.floor(filled / tubeSize)
   return segments - idealSegments;

@@ -10,7 +10,7 @@
     background: #0f172a;
     color: #f1f5f9;
     max-width: 680px;
-    margin: 2rem 0;
+    margin: 0;
     padding: 0 1rem;
   }
   h1 { font-size: 1.5rem; }
@@ -20,6 +20,27 @@
   li { margin: 0.25rem 0; }
   .error { color: #f87171; }
   .help { display: block; color: #94a3b8; font-size: 0.85rem; }
+
+  /* Collapsible solutions. <details>/<summary> gives the toggle, keyboard
+     support and correct semantics for free; this just swaps the default
+     disclosure marker for a chevron that rotates when open. Clicking
+     anywhere on the summary — chevron or title — toggles it. */
+  details.solution { margin: 1rem 0; }
+  details.solution > summary {
+    cursor: pointer;
+    list-style: none;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+  }
+  details.solution > summary::-webkit-details-marker { display: none; }
+  details.solution > summary::before {
+    content: "\25B6";
+    font-size: 0.7em;
+    color: #94a3b8;
+    transition: transform 0.15s ease;
+  }
+  details.solution[open] > summary::before { transform: rotate(90deg); }
 
   #custom-input {
     width: 100%;
@@ -87,8 +108,10 @@
   <h1>Color Puzzle — Today's Solution</h1>
   <p id="status">Loading...</p>
   <div id="board" class="board"></div>
-  <p id="solution">Loading...</p>
-  <ol id="moves"></ol>
+  <details id="solution-details" class="solution" open hidden>
+    <summary id="solution"></summary>
+    <ol id="moves"></ol>
+  </details>
 
   <div id="fallback" hidden>
     <p class="error">Showing the September 1, 2026 solution as an example until today's puzzle can be loaded.</p>
@@ -106,7 +129,10 @@
     <button id="custom-solve-btn">Solve</button>
     <p id="custom-status"></p>
     <div id="custom-board" class="board"></div>
-    <ol id="custom-moves"></ol>
+    <details id="custom-solution-details" class="solution" open hidden>
+      <summary id="custom-solution"></summary>
+      <ol id="custom-moves"></ol>
+    </details>
   </section>
 
   <script type="module">
@@ -293,11 +319,14 @@
       const statusEl = document.getElementById("custom-status");
       const boardEl = document.getElementById("custom-board");
       const movesEl = document.getElementById("custom-moves");
+      const solutionEl = document.getElementById("custom-solution");
+      const solutionDetailsEl = document.getElementById("custom-solution-details");
       const btn = document.getElementById("custom-solve-btn");
 
       statusEl.classList.remove("error");
       boardEl.innerHTML = "";
       movesEl.innerHTML = "";
+      solutionDetailsEl.hidden = true;
 
       let board;
       try {
@@ -318,8 +347,12 @@
 
       try {
         const moves = solveBoard(board, 8000);
-        statusEl.textContent = `Solved in ${moves.length} moves.`;
+        // The move count moves into the collapsible's summary, so the status
+        // line goes back to being only for in-progress and error messages.
+        statusEl.textContent = "";
+        solutionEl.textContent = `Solved in ${moves.length} moves.`;
         renderMoves(movesEl, moves);
+        solutionDetailsEl.hidden = false;
       } catch (err) {
         statusEl.textContent =
           err.message === "TIMEOUT"
@@ -354,6 +387,7 @@
       const statusEl = document.getElementById("status");
       const boardEl = document.getElementById("board");
       const solutionEl = document.getElementById("solution");
+      const solutionDetailsEl = document.getElementById("solution-details");
       const movesEl = document.getElementById("moves");
 
       try {
@@ -362,11 +396,12 @@
         solutionEl.textContent = `Solved in ${data.moves.length} moves.`;
         renderBoard(boardEl, data.board);
         renderMoves(movesEl, data.moves);
+        solutionDetailsEl.hidden = false;
         updateCustomHelp(data.board);
       } catch (err) {
         statusEl.textContent = "Couldn't load today's solution yet — check back later.";
         statusEl.classList.add("error");
-        solutionEl.textContent = "";
+        solutionDetailsEl.hidden = true;
         console.error(err);
         await showFallback();
       }
