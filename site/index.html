@@ -91,6 +91,21 @@
         <ol id="custom-moves"></ol>
       </details>
     </section>
+
+    <section class="card colophon">
+      <h2>Technical Details</h2>
+      <p><i>
+        Finds the daily r/ColorPuzzleGame post on Reddit, scrapes the board, and solves it, using a search
+          algorithm shared between a Python pipeline and the live page it publishes to.
+      </i></p>
+      <p>Each morning, a scheduled script retrieves the daily puzzle, reads the board with Playwright, executes the solver and saves the results to JSON, then pushes it, triggering a GitHub Actions deploy to this page.</p>
+      <p>The solver implements an A* algorithm to return a solution with the fewest possible moves. It's written once in TypeScript. The Python pipeline calls the solver through a small Node CLI. The same code is reached by user input; client code calls it with an 8-second limit. </p>
+      <div class="tags">Python · TypeScript · Playwright · GitHub Actions </div>
+      <div class="card__links">
+        <a class="btn" href="https://github.com/timteachesmath/color-puzzle-solver">View Source</a>
+      </div>
+    </section>
+
   </main>
 
   <script type="module">
@@ -227,7 +242,7 @@
       });
     }
 
-    // solveBoard() itself now comes from ./js/solver.js — compiled from
+    // solveBoard() itself comes from ./js/solver.js — compiled from
     // solver-ts/src/solver.ts, the same source main.py's pipeline uses via
     // solver-ts/src/cli.ts. One implementation instead of two copies.
 
