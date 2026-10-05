@@ -5,7 +5,9 @@
   "scripts": {
     "build": "tsc",
     "typecheck": "tsc --noEmit",
-    "test": "tsc --noEmit && node --test src/solver.test.ts"
+    "test": "tsc --noEmit && node --test src/solver.test.ts",
+    "format": "npx --yes prettier@3 --write src",
+    "format:check": "npx --yes prettier@3 --check src"
   },
   "devDependencies": {
     "typescript": "^5.6.3"

@@ -2,7 +2,13 @@ import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 
 type Tubes = string[];
-import { solveBoard, IndexMinHeap, type Board, type Move, type HeapItem } from "./solver.ts";
+import {
+  solveBoard,
+  IndexMinHeap,
+  type Board,
+  type Move,
+  type HeapItem,
+} from "./solver.ts";
 
 // Same fixture used throughout development (tests/fixtures/sample_board_1.json),
 // cross-checked against the Python reference: 30 moves, valid solution.
@@ -47,7 +53,11 @@ export function doOneMove(tubes: Tubes, x: [number, number]): Tubes {
   const a = tubes[x[0]];
   const b = tubes[x[1]];
   let i = 0;
-  while (a.length > i + 1 && a[i + 1] === a[i] && i + 1 + b.length < TUBE_DEPTH) {
+  while (
+    a.length > i + 1 &&
+    a[i + 1] === a[i] &&
+    i + 1 + b.length < TUBE_DEPTH
+  ) {
     i += 1;
   }
   const r = tubes.slice();
@@ -55,7 +65,6 @@ export function doOneMove(tubes: Tubes, x: [number, number]): Tubes {
   r[x[0]] = a.slice(i + 1);
   return r;
 }
-
 
 /**
  * Replays a solution against a board using the exported doOneMove — the
@@ -72,20 +81,28 @@ function replay(board: Board, moves: Move[]): string[] {
 }
 
 function isSolved(state: string[]): boolean {
-  return state.every((tube) => tube.length === 0 || tube.split("").every((c) => c === tube[0]));
+  return state.every(
+    (tube) => tube.length === 0 || tube.split("").every((c) => c === tube[0]),
+  );
 }
 
 describe("solveBoard", () => {
   test("solves the fixture board in the known-optimal 30 moves", () => {
     const moves = solveBoard(FIXTURE_BOARD);
     assert.equal(moves.length, 30);
-    assert.ok(isSolved(replay(FIXTURE_BOARD, moves)), "replayed moves should reach a fully sorted board");
+    assert.ok(
+      isSolved(replay(FIXTURE_BOARD, moves)),
+      "replayed moves should reach a fully sorted board",
+    );
   });
 
   test("solves the September 1 board in the known-optimal 31 moves", () => {
     const moves = solveBoard(SEPT_1_BOARD);
     assert.equal(moves.length, 31);
-    assert.ok(isSolved(replay(SEPT_1_BOARD, moves)), "replayed moves should reach a fully sorted board");
+    assert.ok(
+      isSolved(replay(SEPT_1_BOARD, moves)),
+      "replayed moves should reach a fully sorted board",
+    );
   });
 
   test("every move references distinct, in-range tubes and a real color", () => {
@@ -143,7 +160,10 @@ describe("IndexMinHeap", () => {
     let item: HeapItem | null;
     while ((item = heap.poll()) !== null) polled.push(item[0]);
 
-    assert.deepEqual(polled, [...values].sort((a, b) => a - b));
+    assert.deepEqual(
+      polled,
+      [...values].sort((a, b) => a - b),
+    );
   });
 
   test("breaks ties on the primary key using the secondary key, ascending", () => {
@@ -153,7 +173,9 @@ describe("IndexMinHeap", () => {
     heap.insert([7, 1, { tag: "a" }]);
     heap.insert([7, 2, { tag: "b" }]);
 
-    const order = [heap.poll(), heap.poll(), heap.poll()].map((i) => (i![2] as { tag: string }).tag);
+    const order = [heap.poll(), heap.poll(), heap.poll()].map(
+      (i) => (i![2] as { tag: string }).tag,
+    );
     assert.deepEqual(order, ["a", "b", "c"]);
   });
 

@@ -1,32 +1,56 @@
 # Color Puzzle Solver
 
-Finds the daily r/ColorPuzzleGame post, scrapes the puzzle's board state,
-solves it, and publishes the solution to a static site.
+**Live site: https://timteachesmath.github.io/color-puzzle-solver/**
+
+Every morning this solves the daily [r/ColorPuzzleGame](https://www.reddit.com/r/ColorPuzzleGame/)
+puzzle in the fewest possible moves and publishes the solution. The page also
+runs the same solver in the browser, so users can type in any board and solve it.
+
+![Today's puzzle and its 31-move solution on the live site](site/screenshot.png)
+
+## Highlights
+
+- **One solver, two runtimes.** The A* search is written once in TypeScript.
+  The browser imports it as an ES module; the Python pipeline calls the same
+  compiled code through a small Node CLI.
+- **Shortest solutions.** The heuristic (color segments still to be
+  merged) never overestimates the moves left, so A* returns an optimal
+  solution. Backed by a hand-written binary heap and unit tests.
+- **Framework-free front end.** Plain HTML, CSS and JavaScript ES modules with
+  no build step for the page. Each board is a CSS grid sized from the puzzle's
+  own tube depth, colors carry letter codes for colorblind players, boards
+  have spoken descriptions for screen readers, and status messages are
+  announced via `aria-live`. The stylesheet and header are shared with my
+  other project pages.
+- **Hands-off publishing.** A scheduled job fetches and solves the puzzle,
+  commits the result, and GitHub Actions runs the tests and redeploys the site.
+
+**Stack:** HTML · TypeScript · Node test
+runner · Python · Playwright · GitHub Actions · GitHub Pages
 
 ## How it works
 
-Reddit closed self-service API registration in late 2025 (the
-"Responsible Builder Policy"), and anonymous headless-browser requests get
-served a reCAPTCHA wall — so this doesn't use PRAW/OAuth. Instead:
+Reddit no longer offers self-service API keys, so the pipeline reads the
+daily post with Playwright using a saved, logged-in browser session:
 
-1. `scraper/auth.py` — one-time interactive login that saves an
-   authenticated Playwright session to `reddit_state.json`.
+1. `scraper/auth.py` — one-time interactive login that saves the browser
+   session to `reddit_state.json`.
 2. `scraper/fetch_post.py` — reuses that session to find the newest post
    in the subreddit.
 3. `scraper/extract_board.py` — loads the post (the game itself renders
-   inside a Devvit webview iframe), clicks the puzzle's colorblind-mode
-   toggle so it writes each color's letter code directly into the DOM,
-   and reads those letters into a board.
-4. `solver-ts/src/solver.ts` — the actual search algorithm (compiled to
-   `site/js/solver.js`). `solver/astar.py` shells out to the compiled
-   Node CLI (`site/js/cli.js`, from `solver-ts/src/cli.ts`) rather than
+   inside a Devvit webview iframe), turns on the puzzle's colorblind mode
+   so each color's letter code is written into the page, and reads those
+   letters into a board.
+4. `solver-ts/src/solver.ts` — the search algorithm (compiled to
+   `site/js/solver.js`). `solver/astar.py` calls the compiled Node CLI
+   (`site/js/cli.js`, from `solver-ts/src/cli.ts`) rather than
    reimplementing it in Python, so the daily pipeline and the browser
    share one implementation instead of two hand-kept-in-sync copies.
 5. `main.py` — runs 1–4 and writes `site/solutions/YYYY-MM-DD.json`.
 6. `site/index.html` — static page that fetches today's JSON and renders
    the moves, and also imports `site/js/solver.js` directly (as an ES
-   module) to power the "Solve Your Own Puzzle" field. No Reddit calls
-   happen client-side — it only ever reads a same-origin JSON file.
+   module) to power the "Solve Your Own Puzzle" field. The page never
+   calls Reddit; it only reads a same-origin JSON file.
 
 ## Setup (local)
 
@@ -54,36 +78,18 @@ small-file writes during extraction. Installing TypeScript globally
 (outside the synced folder, under npm's global prefix) avoids it. Rerun
 `npm run build` in `solver-ts/` any time you change `solver-ts/src/*.ts`.
 
-## Running the tests
-
-```bash
-cd solver-ts
-npm test
-```
-
-Runs `solver-ts/src/solver.test.ts` via Node's built-in test runner
-(`node --test` — no test framework dependency needed). Covers `solveBoard`
-(exact move counts on known boards, each independently verified by
-replaying the moves and confirming the board actually ends up sorted, plus
-edge cases like an already-solved board and the search timeout) and
-`IndexMinHeap` (ordering, tie-breaking, size tracking). Test files are
-excluded from `tsc`'s build (`solver-ts/tsconfig.json`), so they never end
-up in the deployed `site/js/`.
-
-Then create your authenticated session (needed before anything else will
-work — anonymous requests get blocked):
+Then create your browser session (needed before the scraper will work):
 
 ```bash
 python -m scraper.auth
 ```
 
-A real browser window opens to the Reddit login page. Log in manually
-(credentials, 2FA, CAPTCHA — whatever it asks), then press Enter in the
-terminal once you're on your homepage. This saves `reddit_state.json`,
-which `fetch_post.py` and `extract_board.py` both reuse. **Never commit
-this file** — it's login session data (already in `.gitignore`). It will
-expire eventually; re-run `scraper.auth` when things start failing with a
-"no saved Reddit session" or CAPTCHA-related error.
+A real browser window opens to the Reddit login page. Log in manually, then
+press Enter in the terminal once you're on your homepage. This saves
+`reddit_state.json`, which `fetch_post.py` and `extract_board.py` both reuse.
+**Never commit this file** — it's login session data (already in
+`.gitignore`). It will expire eventually; re-run `scraper.auth` when runs
+start failing with a "no saved Reddit session" error.
 
 Run the full pipeline:
 
@@ -91,56 +97,46 @@ Run the full pipeline:
 python main.py
 ```
 
-This writes `site/solutions/YYYY-MM-DD.json`. Open `site/index.html`
-directly (or serve `site/` locally) to see it rendered.
+This writes `site/solutions/YYYY-MM-DD.json`. To see the page, serve `site/`
+locally (opening `index.html` straight from disk won't work, because browsers
+block ES module imports and `fetch` from `file://` pages):
 
-## Daily automation (Windows Task Scheduler)
+```bash
+python -m http.server 8000 --directory site
+```
 
-This runs locally on a schedule rather than in GitHub Actions — the
-pipeline needs the authenticated `reddit_state.json` session, and keeping
-that on your own machine (instead of uploading it as a CI secret) avoids
-handing Reddit session/login data to a third-party service.
+Then open http://localhost:8000.
 
-`scripts/run_daily.ps1` runs the full pipeline (`main.py`) and, if it
-produced a new solution, commits and pushes `site/solutions/*.json` —
-which in turn triggers `.github/workflows/pages.yml` to redeploy the live
-site. Everything it does gets appended to `logs/daily_run.log` (gitignored)
-since there's no console to watch when it runs unattended.
+## Running the tests
 
-To schedule it:
+```bash
+cd solver-ts
+npm test               # type-check + solver tests
+npm run format:check   # Prettier
+```
 
-1. Open Task Scheduler (Start menu → search "Task Scheduler").
-2. **Create Task...** (not "Create Basic Task" — the full dialog gives
-   more control):
-   - **General**: name it something like "Color Puzzle Solver Daily Run".
-     Check "Run whether user is logged on or not" if you want it to run
-     even when locked/logged out.
-   - **Triggers** → New: Daily, at a time comfortably after the puzzle
-     usually posts.
-   - **Actions** → New: Action = "Start a program", Program/script =
-     `powershell.exe`, Add arguments = `-NoProfile -ExecutionPolicy Bypass -File "G:\My Drive\pro\puzzleSolver\scripts\run_daily.ps1"`.
-   - **Settings**: check "Run task as soon as possible after a scheduled
-     start is missed" (covers the machine being asleep/off at the
-     scheduled time).
-3. Save, then right-click the task → **Run** once to test it, and check
-   `logs/daily_run.log` for a clean `=== Run succeeded ===` line.
+`npm test` runs `solver-ts/src/solver.test.ts` via Node's built-in test
+runner (`node --test` — no test framework dependency needed). Covers
+`solveBoard` (exact move counts on known boards, each independently verified
+by replaying the moves and confirming the board actually ends up sorted,
+plus edge cases like an already-solved board and the search timeout) and
+`IndexMinHeap` (ordering, tie-breaking, size tracking). Test files are
+excluded from `tsc`'s build (`solver-ts/tsconfig.json`), so they never end
+up in the deployed `site/js/`.
 
-**If you sign into Windows with a Microsoft account:** "Run whether user
-is logged on or not" needs a real local-account-style password, which a
-Microsoft account sign-in doesn't expose in a form Task Scheduler can use.
-Workaround: temporarily switch Windows sign-in to a local account (Settings
-→ Accounts → Your info → "Sign in with a local account instead") — this
-forces you to set a password for it. Use that password when Task Scheduler
-prompts for credentials, then switch your sign-in back to the Microsoft
-account afterward; the local account and its password stay valid, and
-Task Scheduler keeps using them.
+The scraper's board validation has its own check, run from the repo root:
 
-**Note:** an unattended `git push` needs stored credentials — this only
-works if `git`/`gh` already has cached credentials for your GitHub account
-on this machine (true if you've been pushing manually already). If the
-push step ever fails with an auth error, re-run `gh auth login`.
+```bash
+python -m tests.test_validation
+```
 
-The session in `reddit_state.json` will still expire eventually — when the
-scheduled run's log shows a failure related to it, re-run `scraper.auth`
-as described above.
+GitHub Actions runs the type-check, solver tests and format check on every
+push that touches the site or solver, and also confirms the committed
+`site/js/` matches a fresh build. The deploy only runs if they pass.
 
+## Daily automation
+
+The pipeline runs on a local Windows Task Scheduler job, which commits each
+new solution and pushes it to trigger the deploy. It runs locally rather than
+in GitHub Actions so the Reddit login session never leaves this machine.
+Setup steps are in [docs/daily-automation.md](docs/daily-automation.md).

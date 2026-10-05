@@ -9,13 +9,16 @@
 export type Board = string[][];
 export type Move = { from: number; to: number; color: string };
 
-
 /**
  * Solve a puzzle board (raw top-slot-first order, same shape as the daily
  * JSON's `board` field). Throws if no solution is found or the search
  * exceeds `timeBudgetMs`.
  */
-export function solveBoard(board: Board, timeBudgetMs = 8000, tubeDepth?: number): Move[] {
+export function solveBoard(
+  board: Board,
+  timeBudgetMs = 8000,
+  tubeDepth?: number,
+): Move[] {
   const deadline = Date.now() + timeBudgetMs;
   // Depth can be given explicitly (needed if, say, the board happens to be
   // all-empty and there's nothing to infer from); otherwise infer it from
@@ -27,12 +30,16 @@ export function solveBoard(board: Board, timeBudgetMs = 8000, tubeDepth?: number
   const used = new Set<string>();
 
   const normalizedBoard = board.map((tube) =>
-    tube.length < depth ? padTube(tube, depth) : tube
+    tube.length < depth ? padTube(tube, depth) : tube,
   );
   const tubes: Tube[] = normalizedBoard.map((tube) => new Tube(tube));
 
   const initialPuzzleState = new PuzzleState(tubes, depth);
-  heap.insert([initialPuzzleState.g + initialPuzzleState.h, initialPuzzleState.g, initialPuzzleState]);
+  heap.insert([
+    initialPuzzleState.g + initialPuzzleState.h,
+    initialPuzzleState.g,
+    initialPuzzleState,
+  ]);
 
   let currentItem: HeapItem<PuzzleState> | null;
 
@@ -41,7 +48,7 @@ export function solveBoard(board: Board, timeBudgetMs = 8000, tubeDepth?: number
 
     const state = currentItem[2];
     const canonicalForm = getCanonicalForm(state.tubes);
-    if (used.has(canonicalForm)) continue;   // stale duplicate — skip it
+    if (used.has(canonicalForm)) continue; // stale duplicate — skip it
 
     used.add(canonicalForm);
     if (state.h === 0) return unravelMoves(state);
@@ -66,7 +73,13 @@ export function solveBoard(board: Board, timeBudgetMs = 8000, tubeDepth?: number
   throw new Error("No solution found for this puzzle.");
 }
 
-function tryMove(i: number, j: number, currentState: PuzzleState, used: Set<string>, tubeDepth: number): HeapItem<PuzzleState> | undefined {
+function tryMove(
+  i: number,
+  j: number,
+  currentState: PuzzleState,
+  used: Set<string>,
+  tubeDepth: number,
+): HeapItem<PuzzleState> | undefined {
   const tubes = currentState.tubes;
   if (isLegalMove(tubes[i], tubes[j])) {
     const newTubes = doMove(tubes, i, j, tubeDepth);
@@ -78,11 +91,11 @@ function tryMove(i: number, j: number, currentState: PuzzleState, used: Set<stri
     }
   }
 
-  return undefined
+  return undefined;
 }
 
 function unravelMoves(state: PuzzleState): Move[] {
-  let ret: Move[] = [];
+  const ret: Move[] = [];
 
   let currentState: PuzzleState | null = state;
   while (currentState && currentState.move) {
@@ -94,18 +107,31 @@ function unravelMoves(state: PuzzleState): Move[] {
 }
 
 function isLegalMove(i: Tube, j: Tube): boolean {
-  if (i.capacityUsed === 0) { return false; }
-  if (j.color && i.color !== j.color) { return false; }
-  if (i.colorLength > j.capacityTotal - j.capacityUsed) { return false; }
+  if (i.capacityUsed === 0) {
+    return false;
+  }
+  if (j.color && i.color !== j.color) {
+    return false;
+  }
+  if (i.colorLength > j.capacityTotal - j.capacityUsed) {
+    return false;
+  }
 
   return true;
 }
 
-export function doMove(tubes: Tube[], i: number, j: number, tubeDepth: number): Tube[] {
+function doMove(
+  tubes: Tube[],
+  i: number,
+  j: number,
+  tubeDepth: number,
+): Tube[] {
   const ret = tubes.slice();
   const segmentLength = ret[i].colorLength;
 
-  const jUsed = ret[j].aryTube.slice(0, ret[j].capacityUsed).concat(Array(segmentLength).fill(ret[i].color));
+  const jUsed = ret[j].aryTube
+    .slice(0, ret[j].capacityUsed)
+    .concat(Array(segmentLength).fill(ret[i].color));
   const jTube = padTube(jUsed, tubeDepth);
 
   const iUsed = ret[i].aryTube.slice(0, ret[i].capacityUsed - segmentLength);
@@ -122,7 +148,10 @@ function padTube(tube: string[], length: number): string[] {
 }
 
 function getCanonicalForm(tubes: Tube[]): string {
-  return tubes.map((tube) => tube.toString()).sort().join("|");
+  return tubes
+    .map((tube) => tube.toString())
+    .sort()
+    .join("|");
 }
 
 /** A_star heuristic, A_star heuristic spent portion, payload */
@@ -132,9 +161,15 @@ export type HeapItem<T = unknown> = [number, number, T];
 export class IndexMinHeap<T = unknown> {
   private heap: HeapItem<T>[] = [];
 
-  private getParentIndex(i: number): number { return Math.floor((i - 1) / 2); }
-  private getLeftChildIndex(i: number): number { return 2 * i + 1; }
-  private getRightChildIndex(i: number): number { return 2 * i + 2; }
+  private getParentIndex(i: number): number {
+    return Math.floor((i - 1) / 2);
+  }
+  private getLeftChildIndex(i: number): number {
+    return 2 * i + 1;
+  }
+  private getRightChildIndex(i: number): number {
+    return 2 * i + 2;
+  }
 
   private swap(i1: number, i2: number): void {
     const temp = this.heap[i1];
@@ -194,7 +229,8 @@ export class IndexMinHeap<T = unknown> {
 
       if (
         rightChildIndex < this.heap.length &&
-        this.compare(this.heap[rightChildIndex], this.heap[smallerChildIndex]) < 0
+        this.compare(this.heap[rightChildIndex], this.heap[smallerChildIndex]) <
+          0
       ) {
         smallerChildIndex = rightChildIndex;
       }
@@ -217,7 +253,7 @@ export class IndexMinHeap<T = unknown> {
   }
 }
 
-export class Tube {
+class Tube {
   public readonly aryTube: string[];
   public readonly capacityTotal: number;
   public readonly capacityUsed: number;
@@ -234,8 +270,14 @@ export class Tube {
     aryTube.forEach((pill, n) => {
       if (pill) {
         used += 1;
-        if (n == 0) { segments += 1; }
-        if (n < this.capacityTotal - 1 && aryTube[n + 1] && pill != aryTube[n + 1]) {
+        if (n === 0) {
+          segments += 1;
+        }
+        if (
+          n < this.capacityTotal - 1 &&
+          aryTube[n + 1] &&
+          pill !== aryTube[n + 1]
+        ) {
           segments += 1;
         }
       }
@@ -247,12 +289,14 @@ export class Tube {
       this.color = aryTube[used - 1];
       let colorLength = 0;
       for (let i = used - 1; i >= 0; i--) {
-        if (aryTube[i] === this.color) { colorLength += 1; }
-        else { break; }
+        if (aryTube[i] === this.color) {
+          colorLength += 1;
+        } else {
+          break;
+        }
       }
       this.colorLength = colorLength;
-    }
-    else {
+    } else {
       this.color = "";
       this.colorLength = 0;
     }
@@ -261,7 +305,6 @@ export class Tube {
   toString(): string {
     return this.aryTube.join("");
   }
-
 }
 
 class PuzzleState {
@@ -275,12 +318,11 @@ class PuzzleState {
     tubes: Tube[],
     depth: number,
     previousState?: PuzzleState | null,
-    move?: Move | null
+    move?: Move | null,
   ) {
     if (previousState) {
       this.g = previousState.g + 1;
-    }
-    else {
+    } else {
       this.g = 0;
     }
 
@@ -301,7 +343,7 @@ function getTubesHeuristic(tubes: Tube[], tubeSize: number): number {
     filled += tube.capacityUsed;
   }
 
-  const idealSegments = Math.floor(filled / tubeSize)
+  const idealSegments = Math.floor(filled / tubeSize);
   return segments - idealSegments;
 }
 
@@ -315,67 +357,20 @@ if (import.meta.main) {
   //   console.log(z.capacityTotal, z.capacityUsed, z.segments, z.color, z.colorLength, z.aryTube);
   // });
 
-  console.log(solveBoard([
-    [
-      "B",
-      "B",
-      "C",
-      "Y"
-    ],
-    [
-      "G",
-      "Y",
-      "C",
-      "G"
-    ],
-    [
-      "B",
-      "O",
-      "C",
-      "M"
-    ],
-    [
-      "P",
-      "L",
-      "Y",
-      "L"
-    ],
-    [
-      "G",
-      "O",
-      "R",
-      "O"
-    ],
-    [
-      "Y",
-      "M",
-      "L",
-      "G"
-    ],
-    [
-      "W",
-      "W",
-      "C",
-      "B"
-    ],
-    [
-      "P",
-      "M",
-      "R",
-      "P"
-    ],
-    [
-      "L",
-      "P",
-      "W",
-      "O"
-    ],
-    [
-      "R",
-      "W",
-      "R",
-      "M"
-    ],
-    ["", "", "", ""],
-    ["", "", "", ""]]));
+  console.log(
+    solveBoard([
+      ["B", "B", "C", "Y"],
+      ["G", "Y", "C", "G"],
+      ["B", "O", "C", "M"],
+      ["P", "L", "Y", "L"],
+      ["G", "O", "R", "O"],
+      ["Y", "M", "L", "G"],
+      ["W", "W", "C", "B"],
+      ["P", "M", "R", "P"],
+      ["L", "P", "W", "O"],
+      ["R", "W", "R", "M"],
+      ["", "", "", ""],
+      ["", "", "", ""],
+    ]),
+  );
 }

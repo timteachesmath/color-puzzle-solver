@@ -4,6 +4,13 @@
 <meta charset="UTF-8">
 <title>Tim Cieplowski - Color Puzzle Solutions</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Today's r/ColorPuzzleGame puzzle, solved in the fewest possible moves, plus an in-browser solver for any board.">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Color Puzzle — Today's Solution">
+<meta property="og:description" content="Today's r/ColorPuzzleGame puzzle, solved in the fewest possible moves, plus an in-browser solver for any board.">
+<meta property="og:url" content="https://timteachesmath.github.io/color-puzzle-solver/">
+<meta property="og:image" content="https://timteachesmath.github.io/color-puzzle-solver/screenshot.png">
+<meta name="twitter:card" content="summary_large_image">
 <link rel="stylesheet" href="https://timteachesmath.github.io/site.css">
 <style>
   /* Only what is specific to this page — tokens, base type, links, the
@@ -11,6 +18,13 @@
      site.css. */
 
   #status:not(.error) { color: var(--muted); }
+
+  #orientation-note {
+    margin: -1rem 0 1rem;
+    font-size: 0.75rem;
+    color: var(--muted);
+    opacity: 0.7;
+  }
 
   #custom-input { margin-top: 0.5rem; }
   #custom-solve-btn { margin-top: 0.5rem; }
@@ -63,15 +77,16 @@
 
   <main class="page">
     <h1>Color Puzzle — Today's Solution</h1>
-    <p id="status">Loading...</p>
+    <p id="status" aria-live="polite">Loading...</p>
     <div id="board" class="board"></div>
+    <p id="orientation-note" hidden>Note: on Reddit, each tube is shown inverted. Here, as is common elsewhere, tubes are oriented so the user interacts with the topmost color in the tube. </p>
     <details id="solution-details" class="disclosure" open hidden>
       <summary id="solution"></summary>
       <ol id="moves"></ol>
     </details>
 
     <div id="fallback" hidden>
-      <p class="error">Showing the September 1, 2026 solution as an example until today's puzzle can be loaded.</p>
+      <p class="error">Showing the <span id="fallback-date"></span> solution as an example until today's puzzle can be loaded.</p>
       <div id="fallback-board" class="board"></div>
       <ol id="fallback-moves"></ol>
     </div>
@@ -79,12 +94,12 @@
     <section id="custom">
       <h2>Solve Your Own Puzzle</h2>
       <label class="help" for="custom-input">
-        Enter a letter for each color, a dash for moved colors. Separate tubes with spaces.
+        Enter a letter for each color, a dash for empty spaces like moved colors. Separate tubes with spaces.
       </label>
       <p class="help" id="custom-help">Loading today's puzzle as an example...</p>
       <textarea id="custom-input" rows="2" spellcheck="false"></textarea><br>
       <button id="custom-solve-btn">Solve</button>
-      <p id="custom-status"></p>
+      <p id="custom-status" aria-live="polite"></p>
       <div id="custom-board" class="board"></div>
       <details id="custom-solution-details" class="disclosure" open hidden>
         <summary id="custom-solution"></summary>
@@ -100,7 +115,7 @@
       </i></p>
       <p>Each morning, a scheduled script retrieves the daily puzzle, reads the board with Playwright, executes the solver and saves the results to JSON, then pushes it, triggering a GitHub Actions deploy to this page.</p>
       <p>The solver implements an A* algorithm to return a solution with the fewest possible moves. It's written once in TypeScript. The Python pipeline calls the solver through a small Node CLI. The same code is reached by user input; client code calls it with an 8-second limit. </p>
-      <div class="tags">Python · TypeScript · Playwright · GitHub Actions </div>
+      <div class="tags">HTML · TypeScript · Python · Playwright · GitHub Actions</div>
       <div class="card__links">
         <a class="btn" href="https://github.com/timteachesmath/color-puzzle-solver">View Source</a>
       </div>
@@ -113,13 +128,15 @@
 
     const FALLBACK_DATE = "2026-09-01";
 
-    // Known colors as of writing. Any letter not listed here (the puzzle
-    // has added new ones before, e.g. "L") falls back to a hash-derived
-    // hue in colorForLetter() so a new one never breaks rendering.
+    // Known colors as of writing. Any letter not listed here falls back to
+    // a hash-derived hue in colorForLetter() so a new one never breaks
+    // rendering (the puzzle has changed codes before: indigo went from "I"
+    // to "L").
     const COLOR_MAP = {
       O: "#ffa500", // orange
       P: "#800080", // purple
-      I: "#6366f1", // indigo
+      I: "#6366f1", // indigo (older boards)
+      L: "#6366f1", // indigo (current boards)
       C: "#00ffff", // cyan
       M: "#ff00ff", // magenta
       Y: "#ffff00", // yellow
@@ -127,6 +144,13 @@
       R: "#ff0000", // red
       W: "#d3d3d3", // light gray/white
       B: "#0000ff", // blue
+    };
+
+    // Spoken names for the board's aria-label. Unknown letters are read as
+    // the letter itself.
+    const COLOR_NAMES = {
+      O: "orange", P: "purple", I: "indigo", L: "indigo", C: "cyan", M: "magenta",
+      Y: "yellow", G: "green", R: "red", W: "white", B: "blue",
     };
 
     function colorForLetter(letter) {
@@ -183,6 +207,14 @@
       return `${year}-${pad(month)}-${pad(day)}`;
     }
 
+    // dateStr is "YYYY-MM-DD"; building the Date from its parts (not
+    // parsing the string, which means UTC midnight) keeps the formatted
+    // date from slipping back a day for viewers west of UTC.
+    function formatPuzzleDate(dateStr, options) {
+      const [y, m, d] = dateStr.split("-").map(Number);
+      return new Date(y, m - 1, d).toLocaleDateString(undefined, options);
+    }
+
     async function loadSolution(dateStr) {
       const res = await fetch(`solutions/${dateStr}.json`);
       if (!res.ok) throw new Error(`No solution file found for ${dateStr}`);
@@ -199,6 +231,20 @@
       // so it's set here from the same depth rather than fixed in CSS.
       const depth = Math.max(...board.map((tube) => tube.length));
       el.style.gridTemplateRows = `repeat(${depth}, 1.6rem) auto`;
+
+      // The grid of letters and dashes is meaningless read aloud, so the
+      // whole board is exposed as one image with a spoken description.
+      el.setAttribute("role", "img");
+      el.setAttribute(
+        "aria-label",
+        `Puzzle board, each tube listed top to bottom. ` +
+          board
+            .map((tube, i) => {
+              const colors = [...tube].reverse().map((l) => COLOR_NAMES[l] ?? l);
+              return `Tube ${i + 1}: ${colors.length ? colors.join(", ") : "empty"}.`;
+            })
+            .join(" ")
+      );
 
       board.forEach((tube, i) => {
         const padded = Array(depth - tube.length).fill(null).concat([...tube].reverse());
@@ -346,6 +392,8 @@
 
       try {
         const data = await loadSolution(FALLBACK_DATE);
+        document.getElementById("fallback-date").textContent =
+          formatPuzzleDate(FALLBACK_DATE, { dateStyle: "long" });
         renderBoard(fallbackBoardEl, data.board);
         renderMoves(fallbackMovesEl, data.moves);
         fallbackEl.hidden = false;
@@ -365,7 +413,14 @@
 
       try {
         const data = await loadSolution(today);
-        statusEl.textContent = `${today} puzzle from reddit.com/r/ColorPuzzleGame/`;
+        const link = document.createElement("a");
+        link.href = "https://www.reddit.com/r/ColorPuzzleGame/";
+        link.textContent = "reddit.com/r/ColorPuzzleGame";
+        statusEl.replaceChildren(
+          `${formatPuzzleDate(data.date)} puzzle from `,
+          link
+        );
+        document.getElementById("orientation-note").hidden = false;
         solutionEl.textContent = `Solved in ${data.moves.length} moves.`;
         renderBoard(boardEl, data.board);
         renderMoves(movesEl, data.moves);

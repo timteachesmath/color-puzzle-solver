@@ -10,6 +10,8 @@ on:
     branches: [main]
     paths:
       - "site/**"
+      - "solver-ts/**"
+      - ".github/workflows/pages.yml"
   workflow_dispatch: {}
 
 permissions:
@@ -22,7 +24,38 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: solver-ts
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Install dev dependencies
+        run: npm install
+
+      - name: Type-check and run solver tests
+        run: npm test
+
+      - name: Check formatting
+        run: npm run format:check
+
+      # site/js/ is committed compiled output (Pages serves site/ with no
+      # build step), so make sure it wasn't left stale after a .ts change.
+      - name: Check compiled site/js is up to date
+        run: |
+          npm run build
+          git diff --exit-code -- ../site/js
+
   deploy:
+    needs: test
     runs-on: ubuntu-latest
     environment:
       name: github-pages

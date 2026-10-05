@@ -21,7 +21,11 @@ export function solveBoard(board, timeBudgetMs = 8000, tubeDepth) {
     const normalizedBoard = board.map((tube) => tube.length < depth ? padTube(tube, depth) : tube);
     const tubes = normalizedBoard.map((tube) => new Tube(tube));
     const initialPuzzleState = new PuzzleState(tubes, depth);
-    heap.insert([initialPuzzleState.g + initialPuzzleState.h, initialPuzzleState.g, initialPuzzleState]);
+    heap.insert([
+        initialPuzzleState.g + initialPuzzleState.h,
+        initialPuzzleState.g,
+        initialPuzzleState,
+    ]);
     let currentItem;
     while ((currentItem = heap.poll()) !== null) {
         if (Date.now() > deadline)
@@ -63,7 +67,7 @@ function tryMove(i, j, currentState, used, tubeDepth) {
     return undefined;
 }
 function unravelMoves(state) {
-    let ret = [];
+    const ret = [];
     let currentState = state;
     while (currentState && currentState.move) {
         ret.push(currentState.move);
@@ -83,10 +87,12 @@ function isLegalMove(i, j) {
     }
     return true;
 }
-export function doMove(tubes, i, j, tubeDepth) {
+function doMove(tubes, i, j, tubeDepth) {
     const ret = tubes.slice();
     const segmentLength = ret[i].colorLength;
-    const jUsed = ret[j].aryTube.slice(0, ret[j].capacityUsed).concat(Array(segmentLength).fill(ret[i].color));
+    const jUsed = ret[j].aryTube
+        .slice(0, ret[j].capacityUsed)
+        .concat(Array(segmentLength).fill(ret[i].color));
     const jTube = padTube(jUsed, tubeDepth);
     const iUsed = ret[i].aryTube.slice(0, ret[i].capacityUsed - segmentLength);
     const iTube = padTube(iUsed, tubeDepth);
@@ -98,16 +104,25 @@ function padTube(tube, length) {
     return tube.concat(Array(Math.max(0, length - tube.length)).fill(""));
 }
 function getCanonicalForm(tubes) {
-    return tubes.map((tube) => tube.toString()).sort().join("|");
+    return tubes
+        .map((tube) => tube.toString())
+        .sort()
+        .join("|");
 }
 /** Heap implementation for TypeScript. */
 export class IndexMinHeap {
     constructor() {
         this.heap = [];
     }
-    getParentIndex(i) { return Math.floor((i - 1) / 2); }
-    getLeftChildIndex(i) { return 2 * i + 1; }
-    getRightChildIndex(i) { return 2 * i + 2; }
+    getParentIndex(i) {
+        return Math.floor((i - 1) / 2);
+    }
+    getLeftChildIndex(i) {
+        return 2 * i + 1;
+    }
+    getRightChildIndex(i) {
+        return 2 * i + 2;
+    }
     swap(i1, i2) {
         const temp = this.heap[i1];
         this.heap[i1] = this.heap[i2];
@@ -159,7 +174,8 @@ export class IndexMinHeap {
             let smallerChildIndex = this.getLeftChildIndex(index);
             const rightChildIndex = this.getRightChildIndex(index);
             if (rightChildIndex < this.heap.length &&
-                this.compare(this.heap[rightChildIndex], this.heap[smallerChildIndex]) < 0) {
+                this.compare(this.heap[rightChildIndex], this.heap[smallerChildIndex]) <
+                    0) {
                 smallerChildIndex = rightChildIndex;
             }
             if (this.compare(this.heap[index], this.heap[smallerChildIndex]) <= 0) {
@@ -176,7 +192,7 @@ export class IndexMinHeap {
         return this.heap.length;
     }
 }
-export class Tube {
+class Tube {
     constructor(aryTube) {
         this.aryTube = aryTube;
         this.capacityTotal = aryTube.length;
@@ -185,10 +201,12 @@ export class Tube {
         aryTube.forEach((pill, n) => {
             if (pill) {
                 used += 1;
-                if (n == 0) {
+                if (n === 0) {
                     segments += 1;
                 }
-                if (n < this.capacityTotal - 1 && aryTube[n + 1] && pill != aryTube[n + 1]) {
+                if (n < this.capacityTotal - 1 &&
+                    aryTube[n + 1] &&
+                    pill !== aryTube[n + 1]) {
                     segments += 1;
                 }
             }
@@ -251,67 +269,17 @@ if (import.meta.main) {
     //   console.log(z.capacityTotal, z.capacityUsed, z.segments, z.color, z.colorLength, z.aryTube);
     // });
     console.log(solveBoard([
-        [
-            "B",
-            "B",
-            "C",
-            "Y"
-        ],
-        [
-            "G",
-            "Y",
-            "C",
-            "G"
-        ],
-        [
-            "B",
-            "O",
-            "C",
-            "M"
-        ],
-        [
-            "P",
-            "L",
-            "Y",
-            "L"
-        ],
-        [
-            "G",
-            "O",
-            "R",
-            "O"
-        ],
-        [
-            "Y",
-            "M",
-            "L",
-            "G"
-        ],
-        [
-            "W",
-            "W",
-            "C",
-            "B"
-        ],
-        [
-            "P",
-            "M",
-            "R",
-            "P"
-        ],
-        [
-            "L",
-            "P",
-            "W",
-            "O"
-        ],
-        [
-            "R",
-            "W",
-            "R",
-            "M"
-        ],
+        ["B", "B", "C", "Y"],
+        ["G", "Y", "C", "G"],
+        ["B", "O", "C", "M"],
+        ["P", "L", "Y", "L"],
+        ["G", "O", "R", "O"],
+        ["Y", "M", "L", "G"],
+        ["W", "W", "C", "B"],
+        ["P", "M", "R", "P"],
+        ["L", "P", "W", "O"],
+        ["R", "W", "R", "M"],
         ["", "", "", ""],
-        ["", "", "", ""]
+        ["", "", "", ""],
     ]));
 }
