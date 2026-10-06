@@ -82,14 +82,17 @@ function isLegalMove(i, j) {
     if (j.color && i.color !== j.color) {
         return false;
     }
-    if (i.colorLength > j.capacityTotal - j.capacityUsed) {
+    // Any free space is enough — if the whole block doesn't fit, doMove pours
+    // as much as does. Some boards are unsolvable without these partial
+    // pours (see the test with a single empty tube).
+    if (j.capacityUsed === j.capacityTotal) {
         return false;
     }
     return true;
 }
 function doMove(tubes, i, j, tubeDepth) {
     const ret = tubes.slice();
-    const segmentLength = ret[i].colorLength;
+    const segmentLength = Math.min(ret[i].colorLength, ret[j].capacityTotal - ret[j].capacityUsed);
     const jUsed = ret[j].aryTube
         .slice(0, ret[j].capacityUsed)
         .concat(Array(segmentLength).fill(ret[i].color));

@@ -140,3 +140,10 @@ The pipeline runs on a local Windows Task Scheduler job, which commits each
 new solution and pushes it to trigger the deploy. It runs locally rather than
 in GitHub Actions so the Reddit login session never leaves this machine.
 Setup steps are in [docs/daily-automation.md](docs/daily-automation.md).
+
+## Future exploration
+
+Open questions about the puzzle itself — whether two empty tubes are always
+enough, how inverting every tube changes the optimal solution, how tight the
+heuristic is — along with what measurement has already settled, are in
+[docs/future-exploration.md](docs/future-exploration.md).

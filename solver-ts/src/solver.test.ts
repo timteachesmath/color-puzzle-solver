@@ -116,6 +116,27 @@ describe("solveBoard", () => {
     }
   });
 
+  test("uses a partial pour when a block can't fit anywhere whole", () => {
+    // One empty tube. Mid-solve, a two-unit block has only one free slot
+    // in each matching tube, so it has to be split — with whole-block
+    // pours only this board has no solution at all. 17 moves is the
+    // optimum, confirmed by an exhaustive breadth-first search.
+    const board: Board = [
+      ["B", "D", "C", "D"],
+      ["D", "E", "C", "D"],
+      ["B", "B", "A", "E"],
+      ["E", "C", "A", "A"],
+      ["E", "B", "A", "C"],
+      [],
+    ];
+    const moves = solveBoard(board);
+    assert.equal(moves.length, 17);
+    assert.ok(
+      isSolved(replay(board, moves)),
+      "replayed moves should reach a fully sorted board",
+    );
+  });
+
   test("an already-solved board needs zero moves", () => {
     const solvedBoard: Board = [
       ["A", "A", "A", "A"],
