@@ -1,0 +1,220 @@
+{
+  "date": "2026-11-03",
+  "source_url": "https://www.reddit.com/r/ColorPuzzleGame/comments/1xmeiec/daily_color_puzzle_november_3_2026/",
+  "board": [
+    [
+      "G",
+      "M",
+      "Y",
+      "B"
+    ],
+    [
+      "R",
+      "W",
+      "G",
+      "O"
+    ],
+    [
+      "W",
+      "O",
+      "L",
+      "W"
+    ],
+    [
+      "P",
+      "P",
+      "C",
+      "R"
+    ],
+    [
+      "L",
+      "Y",
+      "R",
+      "C"
+    ],
+    [
+      "O",
+      "O",
+      "B",
+      "P"
+    ],
+    [
+      "M",
+      "M",
+      "R",
+      "W"
+    ],
+    [
+      "L",
+      "P",
+      "C",
+      "Y"
+    ],
+    [
+      "B",
+      "L",
+      "M",
+      "G"
+    ],
+    [
+      "B",
+      "Y",
+      "C",
+      "G"
+    ],
+    [],
+    []
+  ],
+  "moves": [
+    {
+      "from": 7,
+      "to": 11,
+      "color": "Y"
+    },
+    {
+      "from": 8,
+      "to": 10,
+      "color": "G"
+    },
+    {
+      "from": 9,
+      "to": 10,
+      "color": "G"
+    },
+    {
+      "from": 9,
+      "to": 7,
+      "color": "C"
+    },
+    {
+      "from": 9,
+      "to": 11,
+      "color": "Y"
+    },
+    {
+      "from": 0,
+      "to": 9,
+      "color": "B"
+    },
+    {
+      "from": 0,
+      "to": 11,
+      "color": "Y"
+    },
+    {
+      "from": 0,
+      "to": 8,
+      "color": "M"
+    },
+    {
+      "from": 0,
+      "to": 10,
+      "color": "G"
+    },
+    {
+      "from": 7,
+      "to": 0,
+      "color": "C"
+    },
+    {
+      "from": 5,
+      "to": 7,
+      "color": "P"
+    },
+    {
+      "from": 5,
+      "to": 9,
+      "color": "B"
+    },
+    {
+      "from": 1,
+      "to": 5,
+      "color": "O"
+    },
+    {
+      "from": 1,
+      "to": 10,
+      "color": "G"
+    },
+    {
+      "from": 6,
+      "to": 1,
+      "color": "W"
+    },
+    {
+      "from": 4,
+      "to": 0,
+      "color": "C"
+    },
+    {
+      "from": 4,
+      "to": 6,
+      "color": "R"
+    },
+    {
+      "from": 4,
+      "to": 11,
+      "color": "Y"
+    },
+    {
+      "from": 2,
+      "to": 1,
+      "color": "W"
+    },
+    {
+      "from": 2,
+      "to": 4,
+      "color": "L"
+    },
+    {
+      "from": 2,
+      "to": 5,
+      "color": "O"
+    },
+    {
+      "from": 1,
+      "to": 2,
+      "color": "W"
+    },
+    {
+      "from": 3,
+      "to": 1,
+      "color": "R"
+    },
+    {
+      "from": 3,
+      "to": 0,
+      "color": "C"
+    },
+    {
+      "from": 6,
+      "to": 1,
+      "color": "R"
+    },
+    {
+      "from": 8,
+      "to": 6,
+      "color": "M"
+    },
+    {
+      "from": 7,
+      "to": 3,
+      "color": "P"
+    },
+    {
+      "from": 8,
+      "to": 7,
+      "color": "L"
+    },
+    {
+      "from": 8,
+      "to": 9,
+      "color": "B"
+    },
+    {
+      "from": 4,
+      "to": 7,
+      "color": "L"
+    }
+  ]
+}
