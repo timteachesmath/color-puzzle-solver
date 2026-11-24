@@ -16,6 +16,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
   pages: write
   id-token: write
 
@@ -71,6 +72,22 @@ jobs:
         uses: actions/upload-pages-artifact@v3
         with:
           path: site
+
+      # deploy-pages looks the artifact up exactly once, and GitHub's artifact
+      # API can lag a just-finished upload, failing with "No artifacts named
+      # github-pages were found". Poll until it's visible before deploying.
+      - name: Wait for Pages artifact to be visible
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for i in $(seq 1 36); do
+            n=$(gh api "repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts" \
+              -q '[.artifacts[] | select(.name == "github-pages")] | length')
+            if [ "$n" -ge 1 ]; then echo "Artifact visible after $i check(s)"; exit 0; fi
+            sleep 5
+          done
+          echo "::error::github-pages artifact never became visible to the API"
+          exit 1
 
       - name: Deploy to GitHub Pages
         id: deployment
